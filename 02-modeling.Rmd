@@ -260,7 +260,7 @@ test_df_third_selection[1,14]
 
 ## ALE - effets des variables 
 
-(Non compilé, utilisé pour déterminer les effets des variables sur des intervalles de valeurs)
+(Code non exécuté, utilisé pour déterminer les effets des variables sur des intervalles de valeurs)
 ```{r ,eval=FALSE}
 ale_entero <- FeatureEffect$new(predictor_third_selection, feature = "enterobacteries")
 ale_entero$plot()
