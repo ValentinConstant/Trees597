@@ -1,0 +1,333 @@
+# Modélisation
+
+```{r package-read, echo=FALSE,results=FALSE}
+library(readr)
+detach("package:readr", unload = TRUE)
+library(readr)
+```
+
+```{r import-df-optimal-rf, echo=FALSE, results=FALSE}
+df_third_selection <- read_csv("COTTT597_imputed.csv", col_types = cols(
+  cefazo = col_skip(),
+  cefe = col_factor(),
+  cefo = col_skip(),
+  mero = col_skip(),
+  pipe = col_factor(),
+  
+  DSTD = col_double(),
+  continu = col_factor(),
+  
+  INT_6H = col_factor(),
+  INT_8H = col_skip(),
+  INT_12H = col_skip(),
+  INT_24H = col_skip(),
+  
+  
+  MOTTT_aucune = col_skip(),
+  MOTTT_autres = col_skip(),
+
+  MOTTT_pericardite = col_skip(),
+  MOTTT_Pneumopathie_pleuresie = col_skip(),
+  MOTTT_Meningite_encephalite = col_skip(),
+  MOTTT_Infection_voies_biliaires = col_skip(),
+  MOTTT_Infection_tube_digestif_intra_abdo_peritonite = col_skip(),
+  MOTTT_aplasie_febrile = col_skip(),
+  MOTTT_Infection_tissus_cutanes_mous = col_skip(),
+  MOTTT_bacteriemie_liee_au_KT = col_skip(),
+  MOTTT_Antibioprophylaxie_per_operatoire = col_skip(),
+  MOTTT_infection_osteo_articulaire = col_skip(),
+  MOTTT_sepsis_choc_septique = col_skip(),
+  MOTTT_antibiotherapie_empirique_probabiliste_gravite = col_skip(),
+  MOTTT_Pyelonephrite = col_skip(),
+  
+  Fievre = col_skip(),
+  
+  SEXE = col_skip(),
+  PNAm = col_double(),
+  taille = col_double(),
+  BW = col_double(),
+  BWt = col_double(),
+  
+  
+  PATHO_aucune = col_skip(),
+  PATHO_autres = col_skip(),
+  
+  PATHO_cardiovasculaire = col_skip(),
+  PATHO_dermatologique = col_skip(),
+  PATHO_digestive = col_skip(),
+  PATHO_drepanocytose = col_skip(),
+  PATHO_endocrinologique = col_skip(),
+  PATHO_deficit_immunitaire = col_skip(),
+  PATHO_genetique = col_skip(),
+  PATHO_hematologique = col_skip(),
+  PATHO_hepatique = col_skip(),
+  PATHO_infectieux = col_skip(),
+  PATHO_metabolique = col_skip(),
+  PATHO_neurologique = col_skip(),
+  PATHO_respiratoire = col_skip(),
+  PATHO_transplantation = col_skip(),
+  
+  MOADM_aucune = col_skip(),
+  MOADM_autres = col_skip(),
+  
+  MOADM_cardiovasculaire = col_skip(),
+  MOADM_CVO = col_skip(),
+  MOADM_digestive = col_skip(),
+  MOADM_dermatologique = col_skip(),
+  MOADM_hematologique = col_skip(),
+  MOADM_hepatique = col_skip(),
+  MOADM_inconnu = col_skip(),
+  MOADM_infectieux = col_skip(),
+  MOADM_metabolique = col_skip(),
+  MOADM_neurologique = col_skip(),
+  `MOADM_post_greffe` = col_skip(),
+  MOADM_respiratoire = col_skip(),
+  
+  VENT = col_skip(),
+  EER = col_skip(),
+  PELOD2 = col_skip(),
+  DysRespi = col_skip(),
+  DysRen = col_skip(),
+  DysHep = col_skip(),
+  DysNeuro = col_skip(),
+  DysHem = col_skip(),
+  
+  CRP = col_skip(),
+  PNN = col_skip(),
+  PQ = col_skip(),
+  ASAT = col_skip(),
+  ALAT = col_skip(),
+  BiliC = col_skip(),
+  Albu = col_skip(),
+  TP = col_skip(),
+  UreeP = col_skip(),
+  CreatP = col_skip(),
+  Schwartz = col_double(),
+ 
+  CT = col_skip(),
+  Diuretiques = col_skip(),
+  Morphine = col_skip(),
+  BZD = col_skip(),
+  Curare = col_skip(),
+  VasoP = col_skip(),
+  Inotrope = col_skip(),
+  
+  Pres_germe = col_factor(),
+  Pres_CMI = col_skip(),
+  
+  enterobacteries = col_factor(),
+  Pyo = col_factor(),
+  Haemophilus = col_skip(),
+  kingella = col_skip(),
+  Moraxella = col_skip(),
+  Achromo = col_skip(),
+  Neisseria = col_skip(),
+  staph = col_skip(),
+  Strepto = col_skip(),
+  enterocoq = col_skip(),
+  acineto = col_skip(),
+  `S_ maltophilia` = col_skip(),
+  bulkho = col_skip(),
+  
+  Proba = col_factor(),
+  ) )
+```
+
+## Vue des données
+```{r view-opti-df, eval=FALSE}
+library(skimr)
+skimmed_ts <- skim(df_third_selection)
+skimmed_ts
+```
+Les prédicteurs catégoriels retenus sont :
+
+* **cefepime**, informant sur l'utilisation de la cefepime.
+
+* **piperaciline**, informant sur l'utilisation de la piperaciline.
+
+* **continu**, informant sur le caractère continu de l'administration.
+
+* **INT_6H**, informant sur le choix d'un intervalle de dose de 6H en cas d'administration non continue.
+
+* **Pres_germe**, informant sur l'identification du germe.
+
+* **enterobacteries**, informant sur le type de germe (enterobacteries) en cas d'identification.
+
+* **Pyo**, informant sur le type de germe (Pyo) en cas d'identification.
+
+Les prédicteurs quantitatifs sont : 
+
+* **DSTD**, informant sur la quantité de dose administrée (nombre de fois la dose standard)
+
+* **PNAm**, âge du patient en mois.
+
+* **taille**, taille du patient.
+
+* **BW**, poids du patient à la naissance.
+
+* **BWt**, poids du patient lors de l'inclusion dans l'étude.
+
+* **Schwartz**, indice de Schwartz, reflet de la fonction rénale.
+
+## Entrainement, test et tuning du modèle optimisé
+```{r package-opt-rf, echo=FALSE, results=FALSE}
+library(caret)
+library(ggplot2)
+library(lattice)
+```
+```{r split-df-optimal-rf, results=FALSE}
+smp_size <- floor(0.75 * nrow(df_third_selection))
+set.seed(123)
+train_ind_df_third_selection <- sample(seq_len(nrow(df_third_selection)), size = smp_size)
+train_df_third_selection <- df_third_selection[train_ind_df_third_selection, ]
+test_df_third_selection <- df_third_selection[-train_ind_df_third_selection, ]
+```
+```{r tune-opt-rf, results=FALSE}
+rf_grid <- expand.grid(mtry = seq(5:10),
+                      splitrule = c("gini", "extratrees"),
+                      min.node.size = c(1, 3, 5)
+                      )
+
+group_fit_control <- trainControl(method = "cv", number = 10)
+```
+```{r df-optimal-rf, results=FALSE}
+model_rf_third_selec <- caret::train(Proba ~ ., data = train_df_third_selection,method = "ranger", #random forest
+trControl = group_fit_control, tuneGrid = rf_grid,importance="impurity")
+```
+```{r bestTune-opt-rf}
+model_rf_third_selec$bestTune
+```
+
+## Matrice de confusion
+```{r cm-opt-rf}
+test_third_selection <- test_df_third_selection[which(names(test_df_third_selection) != "Proba")]
+predicted_third_selection <- predict(model_rf_third_selec, test_third_selection)
+caret::confusionMatrix(test_df_third_selection$Proba, predicted_third_selection)
+```
+```{r error-opt-rf, echo=FALSE, results=FALSE}
+df_predi_third_selec <- data.frame(sequence(150),test_df_third_selection$Proba, predicted_third_selection)
+library(dplyr)
+df_predi_third_selec %>% filter(df_predi_third_selec$test_df_third_selection.Proba != df_predi_third_selec$predicted_third_selection)
+```
+
+## Importance des variables 
+```{r package-iml, echo=FALSE, results=FALSE}
+set.seed(42)
+library("randomForest")
+library("iml")
+library("lime")
+library("MASS")
+library("e1071")
+```
+```{r rpedictor-opt-rf}
+X_third_selection <- df_third_selection[which(names(df_third_selection) != "Proba")]
+predictor_third_selection <- Predictor$new(model_rf_third_selec, data = X_third_selection, y = df_third_selection$Proba)
+```
+### Méthode de permutation 
+```{r pfi-opt-rf}
+imp <- FeatureImp$new(predictor_third_selection, loss = "ce", compare = "difference", n.repetitions = 5)
+plot(imp)
+```
+```{r gini-opt-rf}
+importance_gini_opt_rf <- varImp(model_rf_third_selec)
+plot(importance_gini_opt_rf)
+```
+
+### LIME
+
+(Code non exécuté, utilisé pour déterminer les effets des variables sur une instance précise)
+```{r ,eval=FALSE}
+model_randomforest <- caret::train(Proba ~ ., data = train_df_third_selection,method = "rf", #random forest
+trControl = group_fit_control)
+```
+```{r ,eval=FALSE}
+#LIME
+library("lime")
+explainer_2 <- lime(train_df_third_selection, model_randomforest)#lime
+explanation_2 <- lime::explain(test_df_third_selection[1, 1:13], explainer_2, n_labels = 1, n_features = 13)
+plot_explanations(explanation_2)
+plot_features(explanation_2)
+
+lime.rf  <- LocalModel$new(predictor_third_selection, k = 12, x.interest =  X_third_selection[1,])
+plot(lime.rf)
+
+shapley.rf <- Shapley$new(predictor_third_selection, x.interest = X_third_selection[1,])
+plot(shapley.rf)
+
+predict(model_randomforest, test_df_third_selection[1, ])
+test_df_third_selection[1,14]
+```
+
+## ALE - effets des variables 
+
+(Non compilé, utilisé pour déterminer les effets des variables sur des intervalles de valeurs)
+```{r ,eval=FALSE}
+ale_entero <- FeatureEffect$new(predictor_third_selection, feature = "enterobacteries")
+ale_entero$plot()
+ale_pyo <- FeatureEffect$new(predictor_third_selection, feature = "Pyo")
+ale_pyo$plot()
+ale_continu <- FeatureEffect$new(predictor_third_selection, feature = "continu")
+ale_continu$plot()
+ale_INT_6H <- FeatureEffect$new(predictor_third_selection, feature = "INT_6H")
+ale_INT_6H$plot()
+ale_cefe <- FeatureEffect$new(predictor_third_selection, feature = "cefe", grid.size = 5)
+ale_cefe$plot()
+ale_pipe <- FeatureEffect$new(predictor_third_selection, feature = "pipe", grid.size = 5)
+ale_pipe$plot()
+```
+```{r ,eval=FALSE}
+# FeatureEffect plots support up to two features:
+eff <- FeatureEffect$new(predictor_third_selection, feature = c("taille", "PNAm"))
+eff$plot(show.data = TRUE)
+eff <- FeatureEffect$new(predictor_third_selection, feature = c("taille", "BWt"))
+eff$plot(show.data = TRUE)
+eff <- FeatureEffect$new(predictor_third_selection, feature = c("PNAm", "BWt"))
+eff$plot(show.data = TRUE)
+eff <- FeatureEffect$new(predictor_third_selection, feature = c("BWt", "DSTD"))
+eff$plot(show.data = TRUE)
+eff <- FeatureEffect$new(predictor_third_selection, feature = c("taille", "DSTD"))
+eff$plot(show.data = TRUE)
+eff <- FeatureEffect$new(predictor_third_selection, feature = c("PNAm", "DSTD"))
+eff$plot(show.data = TRUE)
+```
+
+## Un arbre au lieu d'une forêt ?
+Historiquement, l'arbre de décision était utilisé bien avant les forêts aléatoires.
+
+Voyons ce que donnerait un arbre de décision sur nos données.
+
+```{r load-package-tree,cache=FALSE, echo=FALSE}
+library(rpart.plot)
+library(caret)
+```
+```{r cover-tree, cache=FALSE, echo=FALSE, out.width="70%"}
+knitr::include_graphics('images/tree.jpg', dpi = NA)
+```
+```{r tree-opt}
+tree_third <- rpart(Proba ~ ., data=train_df_third_selection)
+prp(tree_third)
+tree_third
+```
+```{r cm-tree}
+test_df_third_selection_x <- test_df_third_selection[which(names(test_df_third_selection) != "Proba")]
+predicted_third_selection <- predict(tree_third, test_df_third_selection_x)
+predicted_third_selection <- as.factor(ifelse(predicted_third_selection[,1] < .5, 0, 1))
+caret::confusionMatrix(reference = test_df_third_selection$Proba, data = predicted_third_selection, positive = "1")
+```
+
+## Bilan de l'optimisation
+
+La forêt à 94 variables a **91%** de précision.
+La forêt optimisée réduite à 13 variables a **89%**.
+L'arbre seul à 13 variable a **79,3%**.
+
+Ce projet a permis d'identifié les variables les plus importantes pour optimiser le modèle, en vue de son utilisation.
+
+La théorie de la sagesse de la foule (wisdom of the crowd) a bien fonctionné : une forêt de 500 arbres augmente la précision de 10% comparé à un arbre seul.
+
+Pour déployer les modèles en ligne, il faut faire appel aux compétences d'un data engineer.
+
+```{r cover-skills, cache=FALSE, echo=FALSE, out.width="80%"}
+knitr::include_graphics('images/skills.jpg', dpi = NA)
+```
+

@@ -1,0 +1,190 @@
+# Feature engineering
+## La forêt aléatoire
+Pour mesure l'importance des variables, nous allons directement utiliser un modèle bien connu : la forêt aléatoire (Breiman, 2001).
+Petit rappel de ce qu'est une forêt aléatoire (différents arbres de décision entrainés sur des échantillons bootstrappés)
+
+```{r cover-rf, cache=FALSE, echo=FALSE,out.width = "50%"}
+knitr::include_graphics('images/rf.jpg', dpi = NA)
+```
+
+La database va être divisée en deux :
+
+* Le premier set, appelé set d’entraînement, contiendra 75% des données.
+
+* Le deuxième, appelé set de test, contiendra 25% des données.
+
+```{r split-train-test-set, results=FALSE}
+set.seed(123)
+#Pseudo aléatoire : fixer les seeds permet de 
+#reproduire le même hasard d'une exécution de code à une autre.
+smp_size <- floor(0.75 * nrow(df)) #Seuil de 75%
+train_ind <- sample(seq_len(nrow(df)), size = smp_size) #On mélange les lignes
+train_df <- df[train_ind, ] #75% vont au train set
+test_df <- df[-train_ind, ] #25% vont au test set
+```
+
+## Sélection, entrainement et tuning du modèle
+
+```{r load-rf-packages, echo=FALSE, results=FALSE}
+library(ggplot2)
+library(lattice)
+library(caret)
+```
+
+Pour réaliser ses 3 étapes d'un coup, nous allons utiliser un outil très utilisé : 
+
+Les grilles de recherche. Elles contiennent différentes valeurs d'hyperparamètres.
+Chaque combinaison d'hyperparamètre sera testé et la combinaison permettant la meilleure précision sera retenue pour le modèle.
+
+Rappel sur les principaux hyperparamètres d'une forêt aléatoire :
+
+* **mtry** : combien de variables candidates à la scission d'un noeud ? 
+
+* **splitrule** : quelle règle régit la scission d'un noeud ? 
+
+* **min.node.size** : taille minimale que doit contenir un noeud.
+
+```{r tuning-original-rf}
+rf_grid <- expand.grid(mtry = seq(1:5),
+                      splitrule = c("gini", "extratrees"),
+                      min.node.size = c(1, 3, 5)
+                      )
+
+group_fit_control <- trainControl(method = "repeatedcv", number = 10, repeats = 5)
+```
+On entraine le modèle.
+```{r train-original-rf}
+model_rf <- caret::train(Proba ~ ., data = train_df,method = "ranger", #random forest
+trControl = group_fit_control, tuneGrid = rf_grid,  importance="impurity")
+```
+Résulat de l'entrainement :
+```{r resume-original-rf}
+model_rf$bestTune #Meilleur tuning
+```
+Quelle est la précision de ce modèle sur un jeu de donnée inconnu ?
+On peut répondre à cette question grâce au jeu de test et à la matrice de confusion.
+```{r cm-original-rf}
+test <- test_df[which(names(test_df) != "Proba")]
+predicted <- predict(model_rf, test)
+caret::confusionMatrix(test_df$Proba, predicted)
+```
+
+```{r library-pfi-gini, echo=FALSE, results=FALSE}
+set.seed(42)
+library("randomForest")
+library("iml")
+library("lime")
+library("MASS")
+library("e1071")
+```
+
+## Importance des variables 
+Le modèle développé, nous allons pouvoir mesurer l'importance des variables, 
+avec la PFI (permutation feature importance) et l'indice de GINI, lié aux forêts aléatoire.
+```{r predictor-original-rf,echo=FALSE, results=FALSE}
+X <- df[which(names(df) != "Proba")]
+predictor <- Predictor$new(model_rf, data = X, y = df$Proba)
+```
+
+### PFI
+
+Petit rappel de ce qu'est la méthode de permutation (permutation aléatoire des valeurs des prédicteurs et mesure de l'impact sur la prédiction)
+
+```{r cover-pfi, cache=FALSE, echo=FALSE, out.width="60%"}
+knitr::include_graphics('images/permu.png', dpi = NA)
+```
+
+```{r PFI-original-rf}
+imp <- FeatureImp$new(predictor, loss = "ce", compare = "difference", n.repetitions = 5)
+```
+```{r boxplot-pfi-original-rf}
+nom_var_perm <- imp$results[1:10,1]
+val_var_perm <- imp$results[1:10,3]
+barplot(val_var_perm, col=rainbow(25),
+        main = "Permutation Feature Importance",
+        xlab = "Feature", ylab = "Importance")
+legend <- nom_var_perm
+par(mar = c(0, 0, 0, 0))
+plot.new()
+legend("top",legend,legend, col=rainbow(25), lty = 1,
+      lwd = c(1, 1))
+```
+
+### Gini
+
+Les forêts aléatoires possèdent une méthode de mesure de l'importance de variable intrinsèque : 
+elle se base sur le critère de Gini.
+
+```{r gini-cover, cache=FALSE, echo=FALSE, out.width="60%"}
+knitr::include_graphics('images/gini.png', dpi = NA)
+```
+
+```{r Gini-original-rf}
+importance_gini <- varImp(model_rf)
+imp1 <- importance_gini[['importance']]
+#importance_gini$Overall <- importance_gini$Overall / sum(importance_gini$Overall) (en %)
+impgini <- data.frame(row.names(imp1),imp1$Overall)
+impgini_sorted <- impgini[order(-impgini$imp1.Overall),]
+```
+
+```{r boxplot-gini-original-rf}
+nom_var_gini <- impgini_sorted$row.names.imp1.[1:10]
+val_var_gini <- impgini_sorted$imp1.Overall[1:10]
+barplot(val_var_gini, col=rainbow(25),
+        main = "Mean decrease Gini importance",
+        xlab = "Feature", ylab = "Importance")
+legend <- nom_var_gini
+par(mar = c(0, 0, 0, 0))
+plot.new()
+legend("top",legend,legend, lty = 1,col=rainbow(25),
+      lwd = c(1, 1))
+```
+
+### RFE 
+
+La RFE pousse le Feature Engineering un peu plus loin,  au-delà d'une simple mesure d'importance, il va aussi sélectionner un nombre de variable optimisé pour obtenir la précision la plus élevé possible.
+La RFE doit être tunnée : 
+
++ **functions** : quels modèles utiliser ?
+
++ **methods** : quelle type de validation croisée? 
+
++ **number** : combien de folds lors de la validation croisée
+
+```{r tuning-rfe}
+# ensure the results are repeatable
+set.seed(7)
+# load the library
+library(mlbench)
+library(caret)
+```
+
+```{r rfe-original-rfe, eval=FALSE}
+control_1 <- rfeControl(functions=rfFuncs, 
+                        method="cv", 
+                        number=10)
+results <- caret::rfe(df[,1:94],df$Proba, sizes=c(1:94), rfeControl=control_1)
+```
+
+Résultats : nombre de variables retenu, nom de ces variables.
+```{r results-original-rf-rfe, eval=FALSE}
+results$optsize
+results$optVariables
+```
+
+Graphique représentant l'évolution de la précision du modèle selon le nombre de variable retenu. Le pic se trouve là où la précision est la plus élevée.
+Affichage des nom des variables retenues.
+```{r plot-results-o-rfe, , eval=FALSE}
+plot(results, type=c("g", "o"))
+nom_var_rfe <- predictors(results)[1:20]
+legend <- nom_var_rfe
+par(mar = c(0, 0, 0, 0))
+plot.new()
+legend("top",legend,legend, lty = 1,col=rainbow(25),
+      lwd = c(1, 1))
+```
+
+## Conclusion de la partie Feature Engineering
+
+Nous avons décidés de retenir les variables sélectionnées par la RFE.
+La PFI et Gini ont permis de confirmer les prédicteurs les plus importants.
